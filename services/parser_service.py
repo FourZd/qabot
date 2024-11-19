@@ -2,7 +2,7 @@ import aiohttp
 import asyncio
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
-
+from utils.logger import logger
 
 class ParserService:
 
@@ -13,7 +13,7 @@ class ParserService:
                 if response.status == 200:
                     return await response.text()
         except aiohttp.ClientError as e:
-            print(f"Ошибка подключения: {e} для {url}")
+            logger.error(f"Ошибка подключения: {e} для {url}")
         return None
 
     async def validate_url(self, session, url):
@@ -54,7 +54,7 @@ class ParserService:
                     )
                     return {"title": title, "content": content, "url": url}
             except AttributeError:
-                print(f"Ошибка парсинга {url}")
+                logger.error(f"Ошибка парсинга {url}")
         return None
     
     async def crawl(self, base_url):
@@ -73,7 +73,7 @@ class ParserService:
                 if tasks:
                     results = await asyncio.gather(*tasks)
                     for links in results:
-                        print(links)
+                        logger.info(f"links to parse: {links}")
                         to_visit.update(links - visited)
                         all_links.update(links)
                 visited.update(to_visit)

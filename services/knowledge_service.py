@@ -2,7 +2,7 @@ import numpy as np
 import faiss
 from services.embedding_service import EmbeddingService
 import asyncio
-
+from utils.logger import logger
 
 class KnowledgeService:
     def __init__(self, knowledge_base, embedding_service: EmbeddingService, dimension=1536):
@@ -20,24 +20,40 @@ class KnowledgeService:
 
     async def build_index(self):
         """
-        Создание векторного индекса для базы знаний.
+        Асинхронное создание векторного индекса для базы знаний.
         """
-        tasks = [
-            (entry, self.embedding_service.get_embedding(entry['title']))
-            for entry in self.knowledge_base if entry["title"]
-        ]
+        embeddings = []
+        valid_entries = []
 
-        embeddings = await asyncio.gather(*[task[1] for task in tasks])
+        async def process_entry(entry):
+            """
+            Асинхронная обработка одной записи.
+            """
+            if entry["title"]:
+                embedding = await self.embedding_service.get_embedding(entry["title"])
+                if embedding is not None and len(embedding) == self.dimension:
+                    return embedding, entry  # Возвращаем эмбеддинг и запись
+            return None, None
 
-        for (entry, embedding) in zip(tasks, embeddings):
-            if embedding is not None and len(embedding) == self.dimension:
-                self.index.add(np.array([embedding]))
-            else:
-                print(f"Invalid embedding for entry: {entry[0]['title']}")
+        # Асинхронно обрабатываем все записи в knowledge_base
+        results = await asyncio.gather(*(process_entry(entry) for entry in self.knowledge_base))
 
-        self.embeddings = np.array([embedding for embedding in embeddings if embedding is not None])
+        # Разбираем результаты
+        for embedding, entry in results:
+            if embedding is not None:
+                embeddings.append(embedding)
+                valid_entries.append(entry)
+
+        if embeddings:
+            # Добавляем эмбеддинги в FAISS индекс
+            self.index.add(np.array(embeddings, dtype=np.float32))
+            self.knowledge_base = valid_entries  # Обновляем базу знаний только валидными записями
+        else:
+            logger.info("No valid embeddings to add to the index.")
+
+        self.embeddings = np.array(embeddings, dtype=np.float32)
         
-    async def search(self, query, k=1, threshold=0.60):
+    async def search(self, query, k=1, threshold=1.5):
         """
         Поиск в базе знаний на основе запроса.
         :param query: Запрос пользователя.
@@ -50,6 +66,7 @@ class KnowledgeService:
         results = []
         for i in range(k):
             idx = indices[0][i]
+            logger.info(distances[0][i])
             if distances[0][i] <= threshold and idx < len(self.knowledge_base):
                 entry = self.knowledge_base[idx]
                 results.append({

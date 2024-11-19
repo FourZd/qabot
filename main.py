@@ -6,7 +6,7 @@ from services.parser_service import ParserService
 import asyncio
 from openai import AsyncOpenAI
 import os
-
+from utils.logger import logger
 
 openai_client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
@@ -50,7 +50,7 @@ async def main():
         searching_placeholder.write("Ищем информацию в базе знаний...")
         with st.spinner("Обработка..."):
             results = await kb.search(query, k=1)
-            print("results found", results)
+            logger.info(f"results found, {results}")
         searching_placeholder.empty()
 
         if results:
