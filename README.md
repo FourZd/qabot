@@ -77,6 +77,7 @@ poetry install poetry run streamlit run main.py
 ```
 
 ### Через Docker:
+ВАЖНО! Сервер может не возвращать никакой информации при включенном ВПН. В таком случае либо выключите его, либо используйте метод без Docker.
 ```
 docker compose up --build
 ```
